@@ -16,17 +16,23 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 FR create_file_record(char* file){
 	FR fr = (FR)malloc(FR_SIZE);
 	struct stat fileStat;
+	struct timeval tv;
 	if(stat(file,&fileStat) < 0){
 		return NULL;
 	}
 
 	strcpy(fr->file_name,file);
+	gettimeofday(&tv, NULL);
 	fr->file_size = fileStat.st_size;
 	fr->file_protection = fileStat.st_mode;
+	fr->insertion_time = tv.tv_sec;
 	fr->block_offset_1 = 0;
 	fr->block_size_1 = 0;
 	fr->block_offset_2 = 0;

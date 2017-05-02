@@ -70,7 +70,11 @@ int AddRecord(char* file_path, char* file);
  * Fail if no such file_name in the vault.
  * Example: $./vault my_repository.vlt rm file_name
  */
-void RemoveRecord(char* file_path, char* file);
+int RemoveOrFetchRecord(char* vault_path, char* file_to_delete,char* order);
+
+int deleteBlockOrCreateFile(int vf, off_t offset, ssize_t size,char* file_name,char* order);
+
+int deleteSingleBlock(int vf, off_t offset, ssize_t size);
 
 /*
  * File fetch. Create a file with some_file_name in the current directory,
@@ -79,7 +83,7 @@ void RemoveRecord(char* file_path, char* file);
  * Fail if no write permission for the current directory.
  * Example: $./vault my_repository.vlt fetch some_file_name
  */
-void GetRecord(char* file_path, char* file);
+int FetchRecord(int vf, char* file_name,off_t offset,ssize_t size);
 
 /*
  * Vault repository defragmentation. Recognize gaps between data blocks.

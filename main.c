@@ -66,6 +66,8 @@ int main(int argc, char* argv[]){
 	int vf = open("V.vlt", O_RDONLY);
 	v = readVault(vf);
 	if(!v){return -1;}
+	RemoveOrFetchRecord("V.vlt","B.txt","fetch");
+	RemoveOrFetchRecord("V.vlt","B.txt","rm");
 	lseek(vf,FULL_VAULT_SIZE+1,SEEK_SET);
 	buffer[26] = '\0';
 	read(vf,buffer,buffer_size);
@@ -74,5 +76,6 @@ int main(int argc, char* argv[]){
 	printf("Buffer contains: %s\n",buffer);
 	read(vf,buffer,buffer_size);
 	printf("Buffer contains: %s\n",buffer);
+
 
 }
