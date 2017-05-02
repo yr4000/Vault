@@ -19,7 +19,7 @@ typedef struct blocks *Blocks;
 //TODO: maybe the block offset should be handled in a different DS
 typedef struct File_Record {
 	char file_name[256];
-	//int is_empty;
+	int is_deleted;
 	ssize_t file_size;
 	mode_t file_protection;
 	time_t insertion_time;

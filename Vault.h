@@ -54,7 +54,7 @@ void destroyVault(Vault v);
 Vault LoadVault(char* file_path);
 
 //Printout all FAT entries.
-void PrintList(char* file_path);
+int PrintList(char* file_path);
 
 /*
  * Take a file and try to insert it into the vault.
@@ -105,7 +105,7 @@ void DefragVault(char* file_path);
  * Fragmentation Ratio is the ratio of the sum of the gaps and the consumed length.
  * Example: $./vault my_repository.vlt status
  */
-void VaultStatus(char* file_path);
+int VaultStatus(char* file_path);
 
 /*
  *

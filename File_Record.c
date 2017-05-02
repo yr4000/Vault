@@ -33,6 +33,7 @@ FR create_file_record(char* file){
 	fr->file_size = fileStat.st_size;
 	fr->file_protection = fileStat.st_mode;
 	fr->insertion_time = tv.tv_sec;
+	fr->is_deleted = -1;
 	fr->block_offset_1 = 0;
 	fr->block_size_1 = 0;
 	fr->block_offset_2 = 0;

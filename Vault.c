@@ -96,22 +96,35 @@ void destroyVault(Vault v){
 /*
  * Prints all the files existing in the vault
  */
-void PrintList(char* file_path){
-	/*
+int PrintList(char* vault_path){
 	int i;
+	int file_counter = 0;
 	Vault v;
-	FR e;
-	char entryStats[356];
-	//TODO: try to open v
-	for(i=0; i<v->files_amount; i=i+1){
-		//runs over the entry relevant variables and add them to string
-		e = v->files[i];
-		entryStats = e->file_name+"\t"+size_to_string(e->file_size)+"\t"
-				+protection_to_string(e->file_protection)+"\t"+e->insertion_time+"\n";
-		printf(entryStats);
-		//TODO: empty string if necessary
+	FR r;
+	//open vault
+	int vf = open(vault_path, O_RDWR);
+	if(vf<0){
+		printf( "Error opening file: %s\n", strerror( errno ) );
+		return errno;
 	}
-	*/
+	v = readVault(vf);
+	for(i=0; i<100; i++){
+		r = v->files[i];
+		if(r->is_deleted>0){
+			continue;
+		}
+		printf("%s	%dB		%o		%s",
+				r->file_name, r->file_size, r->file_protection, asctime(localtime(&(r->insertion_time))));
+		file_counter++;
+		if(file_counter==v->files_amount) break;
+	}
+	//close vault
+	if(close(vf)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
+	}
+	destroyVault(v);
+	return 1;
+
 }
 
 /*
@@ -156,6 +169,7 @@ int AddRecord(char* vault_path, char* file_to_write){
 	//update vault.
 	v->files[v->files_amount] = r;
 	v->files_amount = v->files_amount+1;
+	v->free_space = v->free_space-r->file_size;
 	v->eof = v->eof + r->file_size +2*BORDER_SIZE;
 	lseek(vf,0,SEEK_SET);
 	//write updated vault to file
@@ -258,6 +272,7 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 	int i,j;
 	Vault v;
 	FR r;
+	char* zero_record = calloc(1,FR_SIZE);
 	//TODO: try to open v
 	int vf = open(vault_path,O_RDWR);
 	if (vf<0){
@@ -271,7 +286,7 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 	}
 	for(i=0;i<v->files_amount;i=i+1){
 		r = v->files[i];
-		if(strcmp(r->file_name,file_name)==0){
+		if(strcmp(r->file_name,file_name)==0 && r->is_deleted<0 ){
 			for(j=0;j<3;j++){
 				switch(j){
 				case 0:
@@ -285,8 +300,19 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 					break;
 				}
 			}
+			if(strcmp(order,"rm")==0){
+				r->is_deleted = 1;
+				v->files_amount--;
+				v->free_space = v->free_space+r->file_size;
+				/*
+				lseek(vf,VAULT_SIZE+FR_SIZE*i+1,SEEK_SET);
+				}
+				*/
+			}
 		}
 	}
+	lseek(vf,0,SEEK_SET);
+	if(writeVaultToFile(vf,v)<0){ return -1;}
 	//close everything
 	if(close(vf)<0){
 		printf( "Error closing file: %s\n", strerror( errno ) );
@@ -370,8 +396,37 @@ void DefragVault(char* file_path){
 
 }
 
-void VaultStatus(char* file_path){
+int VaultStatus(char* vault_path){
+	Vault v;
+	int i;
+	int file_counter = 0;
+	int total_files_size = 0;
+	int vf = open(vault_path,O_RDONLY);
+	if(vf<0){return -1;}
+	v = readVault(vf);
+	//get total size of files
+	for(i=0;i<100;i++){
+		if(v->files[i]->is_deleted>0){
+			continue;
+		}
+		total_files_size = total_files_size + v->files[i]->file_size;
+		file_counter++;
+		if(file_counter == v->files_amount) break;
+	}
+	//get fragmentation ratio
 
+	//close vault
+	if(close(vf)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
+	}
+	destroyVault(v);
+
+	//print statistics
+	printf("Number of files:		%d\n",v->files_amount);
+	printf("Total size:			%dB\n",total_files_size);
+	printf("Fragmentation ratio:		we may never know....\n");
+
+	return 1;
 }
 
 
