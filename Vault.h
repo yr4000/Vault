@@ -27,8 +27,7 @@ typedef struct Vault {
 	off_t eof;	//this is the offset from the begging of the file to the end of it.
 	short files_amount;
 	short deleted_files;
-	FR* files; //TODO is this correct?
-	//FR* recycle_bin;
+	FR* files;
 };
 
 //typedef struct File_Allocation_Table *FAT;
@@ -63,6 +62,14 @@ int PrintList(char* file_path);
  * Fail if there is free space but the content has to be fragmented into more than 3 blocks.
  */
 int AddRecord(char* file_path, char* file);
+
+Blocks* findSpaces(int vf, Vault v);
+
+int isSpace(char* buffer, int i,char c);
+
+int compareBlocks(const void * a, const void * b);
+
+int WriteASingleBlockToFile(int vf, int ftw, int buffer_size, FR r);
 
 /*
  * File deletion. Remove file form the vault.
@@ -116,6 +123,6 @@ int writeVaultToFile(int vault_file,Vault v);
 
 Vault readVault(int vault_file);
 
-int writeFileToVault(int vault_file,char* file_path,int file_size, int buffer_size);
+int writeFileToVault(int vault_file,int file_to_write,int file_size, int buffer_size);
 
 #endif /* VAULT_H_ */

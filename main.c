@@ -57,16 +57,15 @@ int main(int argc, char* argv[]){
 
 	init("V.vlt","200B");
 	printf("Created vault successfully\n");
-	AddRecord("V.vlt","A.txt");
-	printf("Wrote A to V\n");
-	AddRecord("V.vlt","B.txt");
-	printf("Wrote B to V\n");
-	AddRecord("V.vlt","C.txt");
-	printf("Wrote C to V\n");
+	for(i=0; i<2; i++){
+		AddRecord("V.vlt","A.txt");
+		AddRecord("V.vlt","B.txt");
+		AddRecord("V.vlt","C.txt");
+	}
 	PrintList("V.vlt");
 	RemoveOrFetchRecord("V.vlt","B.txt","fetch");
 	RemoveOrFetchRecord("V.vlt","B.txt","rm");
-
+	AddRecord("V.vlt","D.txt");
 	int vf = open("V.vlt", O_RDONLY);
 	v = readVault(vf);
 	if(!v){return -1;}
