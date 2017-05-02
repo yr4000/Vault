@@ -30,7 +30,8 @@
  */
 int init(char* file_path, char* size){
 	//open a new file
-	int f = open(file_path,O_CREAT | O_RDWR | O_TRUNC, 0755);
+	//int f = open(file_path,O_CREAT | O_RDWR | O_TRUNC, 0755);
+	int f = open(file_path,O_CREAT | O_RDWR | O_APPEND | O_TRUNC , 0755);
 	if(f<0){
 		printf( "Error opening file: %s\n", strerror( errno ) );
 		return errno;
@@ -55,6 +56,7 @@ int init(char* file_path, char* size){
  */
 Vault CreateVault(char* sizeAsString){
 	Vault temp = calloc(VAULT_SIZE,1);
+	//int i;
 	ssize_t size = string_to_size(sizeAsString);
 	struct timeval tv;
 	if(size < 0){
@@ -69,6 +71,9 @@ Vault CreateVault(char* sizeAsString){
 	temp->files_amount = 0;
 	temp->deleted_files = 0;
 	temp->files = calloc(100,FR_SIZE);
+	//for(i=0;i<100;i=i+1){
+
+	//}
 	//temp->recycle_bin = (FR*) calloc(100,sizeof(*(temp->recycle_bin)));
 	temp->eof = FULL_VAULT_SIZE;
 	//memset(temp->files, 0, sizeof(temp->files)); //use to clean the files array.
@@ -78,9 +83,11 @@ Vault CreateVault(char* sizeAsString){
 
 void destroyVault(Vault v){
 	int i;
+	/*
 	for(i=0;i<v->files_amount;i=i+1){
 		free(v->files[i]);
 	}
+	*/
 	free(v->files);
 	free(v);
 }
@@ -91,7 +98,7 @@ void destroyVault(Vault v){
  */
 Vault LoadVault(char *file_path){
 	Vault v;
-	int f = open(file_path,O_CREAT | O_RDWR | O_TRUNC, 0755);
+	int f = open(file_path,O_CREAT | O_RDWR , 0755);
 	if(f<0){
 		printf( "Error opening file: %s\n", strerror( errno ) );
 		return NULL;
@@ -138,9 +145,9 @@ int AddRecord(char* vault_path, char* file_to_write){
 	ssize_t bytesWrote,bytesToWrite,deleteBin;
 	FR binRunner;
 	ssize_t *size;
-	off_t *offset;	//TODO prepare for troubles...
-	int buffer_size = 5;
-	char buffer[buffer_size];
+	char temp[30];
+	//off_t *offset;	//TODO prepare for troubles...
+	int buffer_size = 3;
 
 	//creates new file record to f
 	FR r = create_file_record(file_to_write);	//creates empty file-record.
@@ -149,54 +156,48 @@ int AddRecord(char* vault_path, char* file_to_write){
 		return -1;
 	}
 	//open file
-	int vf = open(vault_path, O_RDWR | O_TRUNC);
+	int vf = open(vault_path, O_RDWR);
 	if(vf<0){
 		printf( "Error opening file: %s\n", strerror( errno ) );
 		return errno;
 	}
 	//read vault to v
-	v = (Vault)malloc(VAULT_SIZE);
-		if(read(vf,v,VAULT_SIZE) != VAULT_SIZE){
-			printf("Error: could not read vault\n");
-			return NULL;
-		}
-
-		if(read(vf,v->files,FR_SIZE*100) != FR_SIZE*100){
-			printf("Error: could not read vault\n");
-			return NULL;
-		}
-	//v = readVault(vf);
-	//if(!v){return -1;}
+	v = readVault(vf);
+	if(!v){return -1;}
 
 	//Is there enough space in the vault for the file?
-	if(r->file_size < v->free_space){
+	if(r->file_size > v->free_space){
 		printf("Error - not enough space in the Vault for a file in this size.\n");
 		return -1;
 	}
 	//simple writing file to eof of vault
-	int bytes_read = 0;
 	//add record to list
-	r->block_offset_1 = v->eof;
+	r->block_offset_1 = v->eof+1;
 	r->block_size_1 = r->file_size;
 
-	lseek(vault_path,v->eof,SEEK_SET); //TODO: later modify to any offset
-
+	//update vault.
 	v->files[v->files_amount] = r;
 	v->files_amount = v->files_amount+1;
-	v->eof = v->eof + FR_SIZE +2*BORDER_SIZE;
+	v->eof = v->eof + r->file_size +2*BORDER_SIZE;
+	lseek(vf,0,SEEK_SET);
+	//write updated vault to file
+	if(writeVaultToFile(vf,v)<0){ return -1;}
+
 	//jump to the end of the file
+	lseek(vf,r->block_offset_1,SEEK_SET); //TODO: later modify to any offset
+	//write file content to EOF
 	//write right border
 	if(writeStringToFile(vf,RIGHT_BORDER,BORDER_SIZE)<0){ return -1; }
 	//read file to buffer
-	while(r->file_size > bytes_read){
-		read(file_to_write,buffer,buffer_size);
-		//write file content with buffer
-		if(writeVaultToFile(vf,buffer)<0){ return -1;}
-	}
+	if(writeFileToVault(vf,file_to_write,r->file_size,buffer_size)<0){return -1;}
 	//write left border
 	if(writeStringToFile(vf,LEFT_BORDER,BORDER_SIZE)<0){ return -1;}
-	//close everything
 
+	//close everything
+	if(close(vf)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
+	}
+	destroyVault(v);
 
 	/*
 	//now we need to write the record to file:
@@ -333,14 +334,16 @@ int writeVaultToFile(int vault_file,Vault v){
 		return -1;
 	}
 	//write files
-	if(write(vault_file,&(v->files),FR_SIZE*100) != FR_SIZE*100)
+	if(write(vault_file,v->files,FR_SIZE*100) != FR_SIZE*100)
 		{
-			printf("Error: something went wrong with the vault's files.\n");
-			return -1;
+		printf("Error: something went wrong with the vault's files.\n");
+		return -1;
 		}
+
 
 	return 1;
 }
+
 
 Vault readVault(int vault_file){
 	Vault v = (Vault)malloc(VAULT_SIZE);
@@ -349,12 +352,39 @@ Vault readVault(int vault_file){
 		return NULL;
 	}
 
+	v->files = (FR*)calloc(100,FR_SIZE);
 	if(read(vault_file,v->files,FR_SIZE*100) != FR_SIZE*100){
 		printf("Error: could not read vault\n");
 		return NULL;
 	}
 
 	return v;
+}
+
+int writeFileToVault(int vault_file,char* file_path,int file_size, int buffer_size){
+	char buffer[buffer_size];
+	int bytes_read = 0;
+	//open file
+	int f = open(file_path,O_RDONLY);
+	if(f<0){
+		printf( "Error opening file: %s\n", strerror( errno ) );
+		return errno;
+	}
+
+	//write file content using buffer
+	while(file_size > bytes_read){
+		int k = read(f,buffer,buffer_size);
+		if(write(vault_file,buffer,k) != k)
+		{
+			printf("Error: something went wrong with the vault's files.\n");
+			return -1;
+		}
+		bytes_read = bytes_read+k;
+	}
+	if(close(f)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
+	}
+	return 1;
 }
 
 

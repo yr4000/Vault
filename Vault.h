@@ -112,4 +112,6 @@ int writeVaultToFile(int vault_file,Vault v);
 
 Vault readVault(int vault_file);
 
+int writeFileToVault(int vault_file,char* file_path,int file_size, int buffer_size);
+
 #endif /* VAULT_H_ */
