@@ -25,7 +25,6 @@
 #define LEFT_BORDER ">>>>>>>>"
 #define ZERO_BORDER "00000000"
 #define BORDER_SIZE 8
-#define BUFFER_SIZE 1024
 
 /*
  * Write a new vault to a file
@@ -133,8 +132,13 @@ int PrintList(char* vault_path){
  */
 int AddRecord(char* vault_path, char* file_to_write){
 	Vault v;
-	Blocks* spaces;
-	int buffer_size = 6;
+	int i,j,block_counter;
+	ssize_t bytesWrote,bytesToWrite,deleteBin;
+	FR binRunner;
+	ssize_t *size;
+	char temp[30];
+	//off_t *offset;	//TODO prepare for troubles...
+	int buffer_size = 3;
 
 	//creates new file record to f
 	FR r = create_file_record(file_to_write);	//creates empty file-record.
@@ -157,33 +161,11 @@ int AddRecord(char* vault_path, char* file_to_write){
 		printf("Error - not enough space in the Vault for a file in this size.\n");
 		return -1;
 	}
-
-	//open file_to_write
-	int ftw = open(file_to_write,O_RDONLY);
-	if(ftw<0){
-		printf( "Error opening file: %s\n", strerror( errno ) );
-		return errno;
-	}
-
-	//TODO: complete this!
-	//search for a free space
-	spaces = findSpaces(vf,v);
-	if(!spaces){
-		r->block_offset_1 = v->eof;
-		r->block_size_1 = r->file_size;
-	}
-	//calculate free space size
-	//if found - ONLY UPDATE THE RECORDS VARIABLES!
-	//if it's enough space - go to writing phase
-	//if not - continue the search
-	//if went thorugh three empty spaces and didn't fit in - throw error
-	//if it fits - write the records in the first available place. (deleted of the end)
-	//write the data itself.
-
 	//simple writing file to eof of vault
 	//add record to list
+	r->block_offset_1 = v->eof;
+	r->block_size_1 = r->file_size;
 
-	WriteASingleBlockToFile(vf,ftw,buffer_size,r);
 	//update vault.
 	v->files[v->files_amount] = r;
 	v->files_amount = v->files_amount+1;
@@ -193,104 +175,94 @@ int AddRecord(char* vault_path, char* file_to_write){
 	//write updated vault to file
 	if(writeVaultToFile(vf,v)<0){ return -1;}
 
-	//close everything
-	if(close(vf)<0){
-		printf( "Error closing file: %s\n", strerror( errno ) );
-	}
-	if(close(ftw)<0){
-		printf( "Error closing file: %s\n", strerror( errno ) );
-	}
-	destroyVault(v);
-
-	return 1;
-
-}
-
-Blocks* findSpaces(int vf, Vault v){
-	off_t offset_counter = FULL_VAULT_SIZE+1;
-	if(v->eof == offset_counter){
-		return NULL;
-	}
-	Blocks* spaces = (Blocks*)calloc(300,BLOCK_SIZE);
-	char buffer[BUFFER_SIZE+1];
-	char start = '>';
-	char end = '<';
-	int i;
-	int space_size_counter = 0;
-	int space_number_counter = 0;
-	int started = -1;
-	lseek(vf,offset_counter,SEEK_SET);
-	isjdfosihdfosdih
-	while(offset_counter+BORDER_SIZE < v->eof){
-		//read from vault to buffer
-		int k = read(vf,buffer,BUFFER_SIZE);
-		//run along the buffer
-		for(i=0; i<k; i++){
-			offset_counter++;
-			//if you found space - start counting it's size and write it's offset.
-			if(isSpace(buffer,i,start)>0){
-				i = i+BORDER_SIZE;
-				offset_counter = offset_counter + BORDER_SIZE;
-				if(isSpace(buffer,i,end)>0){
-					i = i+BORDER_SIZE;
-					offset_counter = offset_counter + BORDER_SIZE;
-				}
-				spaces[space_number_counter]->block_offset = offset_counter;
-				space_number_counter++;
-				space_size_counter = offset_counter;
-				started = -started;
-				continue;
-			}
-			//when you found it's end - stop counting size
-			if(isSpace(buffer,i,end)>0 && started>0){
-				spaces[space_number_counter-1]->block_size = offset_counter-space_size_counter;
-				i = i+BORDER_SIZE;
-				offset_counter = offset_counter + BORDER_SIZE;
-			}
-		}
-	}
-	if(space_number_counter>0){
-		spaces[space_number_counter]->block_offset = v->eof;
-		spaces[space_number_counter]->block_size = FULL_VAULT_SIZE+v->vault_size  - v->eof;
-	}
-	//realloc blocks
-	spaces = (Blocks*)realloc(spaces,space_number_counter*BLOCK_SIZE);
-	//sort blocks
-	qsort(spaces,space_number_counter*BLOCK_SIZE,BLOCK_SIZE,compareBlocks);
-
-	return spaces;
-}
-
-int isSpace(char* buffer, int i, char c){
-	int j;
-	for(j=0;j<BORDER_SIZE;j++){
-		if(buffer[i+j] != c){
-			return -1;
-		}
-	}
-	return 1;
-}
-
-int compareBlocks(const void * a, const void * b){
-	Blocks block_a =  *(Blocks*)a;
-	Blocks block_b = *(Blocks*)b;
-	return (block_a->block_size  - block_b->block_size );
-	}
-
-
-int WriteASingleBlockToFile(int vf, int ftw, int buffer_size, FR r){
 	//jump to the end of the file
 	lseek(vf,r->block_offset_1,SEEK_SET); //TODO: later modify to any offset
 	//write file content to EOF
 	//write right border
 	if(writeStringToFile(vf,RIGHT_BORDER,BORDER_SIZE)<0){ return -1; }
 	//read file to buffer
-	if(writeFileToVault(vf,ftw,r->file_size,buffer_size)<0){return -1;}
+	if(writeFileToVault(vf,file_to_write,r->file_size,buffer_size)<0){return -1;}
 	//write left border
 	if(writeStringToFile(vf,LEFT_BORDER,BORDER_SIZE)<0){ return -1;}
 
-	return 1;
+	//close everything
+	if(close(vf)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
+	}
+	destroyVault(v);
 
+	/*
+	//now we need to write the record to file:
+	bytesWrote = 0;
+	block_counter = 0;
+	deleteBin = 0;
+	binRunner = *(v->recycle_bin);	//TODO: check this works
+	while(binRunner){	//for each file
+		for(j=0; j<3; j = j+1){	//for each block
+			size = &(binRunner->blocks[j]->block_size);	//TODO: check it changes the actual content
+			offset = &(binRunner->blocks[j]->block_offset);
+			//if size>0 then there is available space to write
+			if(*size>0){
+				//in order to frag to no more then 3 blocks
+				if(bytesWrote > *size && j==3){
+					continue;
+				}
+				else{
+					r->blocks[block_counter]->block_offset = *offset;
+					//is what's left is smaller then the size of the block, write what's left.
+					if(r->file_size-bytesWrote < *size){
+						bytesToWrite = r->file_size-bytesWrote;
+					}
+					else{
+						bytesToWrite = *size;
+					}
+					r->blocks[block_counter]->block_size = bytesToWrite;
+					*size = *size - bytesToWrite;
+					*offset = 0;
+					block_counter = block_counter+1;
+					bytesWrote = bytesWrote + bytesToWrite;
+				}
+			}
+			if(*size==0) {
+				deleteBin = deleteBin + 1;
+			}
+		}
+		//delete bin if it is empty.
+		if(deleteBin == 3){
+			//connect the two surrounding him
+			binRunner->prev->next = binRunner->next;
+			binRunner->next->prev = binRunner->prev;
+			//take a step back
+			binRunner = binRunner->prev;
+			//get rid of him;
+			binRunner->next->next = NULL;
+			binRunner->next->prev = NULL;
+		}
+		binRunner = binRunner->next;
+	}
+	//TODO: if we didn't succeed to place the file but we know there is enough place for him - defrag
+	//TODO: what if there is no place at the end of the file??
+	int fw = open(file_to_write,O_RDONLY);
+
+		defrag();
+		//restrat the record
+		//write in the end
+	}
+	//write everything you got
+	//if you still have something to write - do it at the end of the file.
+	else{
+		for(i=0;i<block_counter;i = i+1){
+			if(write(r->blocks[i]->block_offset,,output_b_p) < output_b_p)
+			{
+				dkjnvkxdjvnx
+				printf("Error: something went wrong with the writing - terminating the program.\n");
+				return -1;
+			}
+		}
+	}
+	*/
+
+	return 1;
 }
 
 /*
@@ -300,7 +272,7 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 	int i,j;
 	Vault v;
 	FR r;
-	//char* zero_record = calloc(1,FR_SIZE);
+	char* zero_record = calloc(1,FR_SIZE);
 	//TODO: try to open v
 	int vf = open(vault_path,O_RDWR);
 	if (vf<0){
@@ -503,19 +475,28 @@ Vault readVault(int vault_file){
 	return v;
 }
 
-int writeFileToVault(int vault_file,int file_to_write,int file_size, int buffer_size){
+int writeFileToVault(int vault_file,char* file_path,int file_size, int buffer_size){
 	char buffer[buffer_size];
 	int bytes_read = 0;
+	//open file
+	int f = open(file_path,O_RDONLY);
+	if(f<0){
+		printf( "Error opening file: %s\n", strerror( errno ) );
+		return errno;
+	}
 
 	//write file content using buffer
 	while(file_size > bytes_read){
-		int k = read(file_to_write,buffer,buffer_size);
+		int k = read(f,buffer,buffer_size);
 		if(write(vault_file,buffer,k) != k)
 		{
 			printf("Error: something went wrong with the vault's files.\n");
 			return -1;
 		}
 		bytes_read = bytes_read+k;
+	}
+	if(close(f)<0){
+		printf( "Error closing file: %s\n", strerror( errno ) );
 	}
 	return 1;
 }
