@@ -32,7 +32,6 @@
  */
 int init(char* file_path, char* size){
 	//open a new file
-	//int f = open(file_path,O_CREAT | O_RDWR | O_TRUNC, 0755);
 	int f = open(file_path,O_CREAT | O_RDWR | O_APPEND | O_TRUNC , 0755);
 	if(f<0){
 		printf( "Error opening file: %s\n", strerror( errno ) );
@@ -71,25 +70,13 @@ Vault CreateVault(char* sizeAsString){
 	temp->creation_stump = tv.tv_sec; //TODO maybe needs to be more accurate
 	temp->last_modified = tv.tv_sec;
 	temp->files_amount = 0;
-	temp->deleted_files = 0;
 	temp->files = calloc(100,FR_SIZE);
-	//for(i=0;i<100;i=i+1){
-
-	//}
-	//temp->recycle_bin = (FR*) calloc(100,sizeof(*(temp->recycle_bin)));
 	temp->eof = FULL_VAULT_SIZE+1;
-	//memset(temp->files, 0, sizeof(temp->files)); //use to clean the files array.
 
 	return temp;
 }
 
 void destroyVault(Vault v){
-	int i;
-	/*
-	for(i=0;i<v->files_amount;i=i+1){
-		free(v->files[i]);
-	}
-	*/
 	free(v->files);
 	free(v);
 }
@@ -133,8 +120,8 @@ int PrintList(char* vault_path){
  */
 int AddRecord(char* vault_path, char* file_to_write){
 	Vault v;
-	Blocks* spaces;
-	int buffer_size = 6;
+	//Blocks* spaces;
+	int buffer_size = BUFFER_SIZE;
 
 	//creates new file record to f
 	FR r = create_file_record(file_to_write);	//creates empty file-record.
@@ -166,6 +153,7 @@ int AddRecord(char* vault_path, char* file_to_write){
 	}
 
 	//TODO: complete this!
+	/*
 	//search for a free space
 	spaces = findSpaces(vf,v);
 	if(!spaces){
@@ -179,9 +167,12 @@ int AddRecord(char* vault_path, char* file_to_write){
 	//if went thorugh three empty spaces and didn't fit in - throw error
 	//if it fits - write the records in the first available place. (deleted of the end)
 	//write the data itself.
+	*/
 
 	//simple writing file to eof of vault
-	//add record to list
+	//intialize record:
+	r->block_offset_1 = v->eof;
+	r->block_size_1 = r->file_size;
 
 	WriteASingleBlockToFile(vf,ftw,buffer_size,r);
 	//update vault.
@@ -189,7 +180,6 @@ int AddRecord(char* vault_path, char* file_to_write){
 	v->files_amount = v->files_amount+1;
 	v->free_space = v->free_space-r->file_size;
 	v->eof = v->eof + r->file_size +2*BORDER_SIZE;
-	lseek(vf,0,SEEK_SET);
 	//write updated vault to file
 	if(writeVaultToFile(vf,v)<0){ return -1;}
 
@@ -206,6 +196,7 @@ int AddRecord(char* vault_path, char* file_to_write){
 
 }
 
+//TODO: didn't had time to complete this :(
 Blocks* findSpaces(int vf, Vault v){
 	off_t offset_counter = FULL_VAULT_SIZE+1;
 	if(v->eof == offset_counter){
@@ -220,7 +211,7 @@ Blocks* findSpaces(int vf, Vault v){
 	int space_number_counter = 0;
 	int started = -1;
 	lseek(vf,offset_counter,SEEK_SET);
-	isjdfosihdfosdih
+
 	while(offset_counter+BORDER_SIZE < v->eof){
 		//read from vault to buffer
 		int k = read(vf,buffer,BUFFER_SIZE);
@@ -285,7 +276,7 @@ int WriteASingleBlockToFile(int vf, int ftw, int buffer_size, FR r){
 	//write right border
 	if(writeStringToFile(vf,RIGHT_BORDER,BORDER_SIZE)<0){ return -1; }
 	//read file to buffer
-	if(writeFileToVault(vf,ftw,r->file_size,buffer_size)<0){return -1;}
+	if(writeFileToVault(vf,ftw,r->block_size_1,buffer_size)<0){return -1;}
 	//write left border
 	if(writeStringToFile(vf,LEFT_BORDER,BORDER_SIZE)<0){ return -1;}
 
@@ -300,8 +291,6 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 	int i,j;
 	Vault v;
 	FR r;
-	//char* zero_record = calloc(1,FR_SIZE);
-	//TODO: try to open v
 	int vf = open(vault_path,O_RDWR);
 	if (vf<0){
 		printf("Error in removing record - could not open vault file\n");
@@ -332,14 +321,10 @@ int RemoveOrFetchRecord(char* vault_path, char* file_name,char* order){
 				r->is_deleted = 1;
 				v->files_amount--;
 				v->free_space = v->free_space+r->file_size;
-				/*
-				lseek(vf,VAULT_SIZE+FR_SIZE*i+1,SEEK_SET);
-				}
-				*/
 			}
 		}
 	}
-	lseek(vf,0,SEEK_SET);
+
 	if(writeVaultToFile(vf,v)<0){ return -1;}
 	//close everything
 	if(close(vf)<0){
@@ -379,21 +364,11 @@ int deleteSingleBlock(int vf, off_t offset, ssize_t size){
  * Fetches record from the vault
  */
 int FetchRecord(int vf, char* file_name,off_t offset,ssize_t size){
-	//temporary:
-	char new_file_name[260];
-	int name_len = 0;
-	while(file_name[name_len] != '\0'){
-		name_len++;
-	}
-	strncpy(new_file_name,file_name,name_len-4);
-	strcat(new_file_name,"-fetched.txt");
-
-	//real code:
 	int bytes_wrote = 0;
 	int buffer_size = 5;
 	char* buffer[buffer_size];
 	//open the file
-	int f = open(new_file_name,O_CREAT | O_RDWR | O_APPEND , 0755);
+	int f = open(file_name,O_CREAT | O_RDWR | O_APPEND , 0755);
 	if(f<0){
 		printf("Error in fetch file - could not open the file\n");
 				return -1;
@@ -468,8 +443,8 @@ int writeStringToFile(int file,char* buffer,int buffer_size){
 }
 
 //source: http://moodle.tau.ac.il/mod/forum/discuss.php?d=49960
-//TODO: should it be responsible to open the file?
 int writeVaultToFile(int vault_file,Vault v){
+	lseek(vault_file,0,SEEK_SET);
 	if(write(vault_file,v,VAULT_SIZE) != VAULT_SIZE)
 	{
 		printf("Error: something went wrong with the writing a vault - terminating the program.\n");
@@ -520,4 +495,53 @@ int writeFileToVault(int vault_file,int file_to_write,int file_size, int buffer_
 	return 1;
 }
 
+
+void lowerString(char** s){
+	int i;
+	for(i=0;i<strlen(*s);i=i+1){
+		s[0][i] = tolower(s[0][i]);
+	}
+}
+
+int main3(int argc, char* argv[]){
+	if(argc>4){
+		printf("Invalid number of arguments\n");
+		return -1;
+	}
+
+	lowerString(&argv[2]);
+	if(strcmp(argv[2],"init") == 0){
+		init(argv[1],argv[3]);
+	}
+
+	else if(strcmp(argv[2],"list") == 0){
+		PrintList(argv[1]);
+	}
+
+	else if(strcmp(argv[2],"add") == 0){
+		AddRecord(argv[1],argv[3]);
+	}
+
+	else if(strcmp(argv[2],"rm") == 0){
+		RemoveOrFetchRecord(argv[1],argv[3],"rm");
+	}
+
+	else if(strcmp(argv[2],"fetch") == 0){
+		RemoveOrFetchRecord(argv[1],argv[3],"fetch");
+	}
+
+	else if(strcmp(argv[2],"defrag") == 0){
+
+	}
+
+	else if(strcmp(argv[2],"status") == 0){
+		VaultStatus(argv[1]);
+	}
+
+	else{
+
+	}
+
+	return 1;
+}
 
