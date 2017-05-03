@@ -18,8 +18,9 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/time.h>
+#include <ctype.h>
 
-
+/*
 void writeAToFile(int path, int size){
 	int i;
 	int f = open(path,O_CREAT | O_RDWR | O_TRUNC, 0755);
@@ -39,17 +40,58 @@ void writeAToFile(int path, int size){
 		//return -1;
 		}
 }
+*/
+
+
+void lowerString(char** s){
+	int i;
+	for(i=0;i<strlen(*s);i=i+1){
+		s[0][i] = tolower(s[0][i]);
+	}
+}
 
 int main(int argc, char* argv[]){
-	/*
-	if(argc<4){
+	if(argc>4){
 		printf("Invalid number of arguments\n");
 		return -1;
 	}
-	*/
 
-	//writeAToFile("AAA.txt",50);
+	lowerString(&argv[2]);
+	if(strcmp(argv[2],"init") == 0){
+		init(argv[1],argv[3]);
+	}
 
+	else if(strcmp(argv[2],"list") == 0){
+		PrintList(argv[1]);
+	}
+
+	else if(strcmp(argv[2],"add") == 0){
+		AddRecord(argv[1],argv[3]);
+	}
+
+	else if(strcmp(argv[2],"rm") == 0){
+		RemoveOrFetchRecord(argv[1],argv[3],"rm");
+	}
+
+	else if(strcmp(argv[2],"fetch") == 0){
+		RemoveOrFetchRecord(argv[1],argv[3],"fetch");
+	}
+
+	else if(strcmp(argv[2],"defrag") == 0){
+
+	}
+
+	else if(strcmp(argv[2],"status") == 0){
+		VaultStatus(argv[1]);
+	}
+
+	else{
+
+	}
+
+	return 1;
+
+	//test:
 	Vault v;
 	int i;
 	int buffer_size = 26;
